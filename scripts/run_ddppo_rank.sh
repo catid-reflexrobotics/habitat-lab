@@ -12,6 +12,9 @@ MASTER_HOST="ripper"
 NUM_NODES=2
 DDPPO_ENV_FILE="${REPO_ROOT}/scripts/.ddppo_env"
 
+# shellcheck source=scripts/ddppo_common.sh
+source "${REPO_ROOT}/scripts/ddppo_common.sh"
+
 if [[ -f "${DDPPO_ENV_FILE}" ]]; then
   # shellcheck source=/dev/null
   source "${DDPPO_ENV_FILE}"
@@ -80,6 +83,7 @@ source "${REPO_ROOT}/scripts/ddppo_env_utils.sh"
 export CUDA_VISIBLE_DEVICES
 
 ensure_rearrange_assets
+ensure_rearrange_dataset
 
 echo "[ddppo] Host=${HOST_FQDN} Rank=${NODE_RANK} GPUs=${CUDA_VISIBLE_DEVICES} Master=${MASTER_HOST}:${MASTER_PORT} Nodes=${NUM_NODES}"
 

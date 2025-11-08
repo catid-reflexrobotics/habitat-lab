@@ -225,5 +225,8 @@ def check_and_gen_physics_config():
         "restitution_coefficient": 0.1,
         "rigid object paths": ["objects"],
     }
+    physics_config_dir = os.path.dirname(DEFAULT_PHYSICS_CONFIG_PATH)
+    if physics_config_dir:
+        os.makedirs(physics_config_dir, exist_ok=True)
     with open(DEFAULT_PHYSICS_CONFIG_PATH, "w") as f:
         json.dump(physics_config, f)
