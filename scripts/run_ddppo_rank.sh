@@ -75,7 +75,11 @@ fi
 
 # shellcheck source=/dev/null
 source "${REPO_ROOT}/scripts/setup_headless_env.sh"
+# shellcheck source=/dev/null
+source "${REPO_ROOT}/scripts/ddppo_env_utils.sh"
 export CUDA_VISIBLE_DEVICES
+
+ensure_rearrange_assets
 
 echo "[ddppo] Host=${HOST_FQDN} Rank=${NODE_RANK} GPUs=${CUDA_VISIBLE_DEVICES} Master=${MASTER_HOST}:${MASTER_PORT} Nodes=${NUM_NODES}"
 
@@ -83,6 +87,11 @@ IFS=',' read -r -a GPU_IDS <<< "${CUDA_VISIBLE_DEVICES}"
 NUM_GPUS="${#GPU_IDS[@]}"
 
 cd "${REPO_ROOT}"
+
+# Keep Habitat's distributed rendezvous helpers (which read MAIN_{ADDR,PORT})
+# in sync with torchrun's arguments so every rank connects to the same store.
+export MAIN_ADDR="${MASTER_HOST}"
+export MAIN_PORT="${MASTER_PORT}"
 
 torchrun \
   --nnodes="${NUM_NODES}" \

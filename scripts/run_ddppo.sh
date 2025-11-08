@@ -13,6 +13,9 @@ MASTER_PORT=23456
 
 # shellcheck source=/dev/null
 source "${REPO_ROOT}/scripts/setup_headless_env.sh"
+# shellcheck source=/dev/null
+source "${REPO_ROOT}/scripts/ddppo_env_utils.sh"
+ensure_rearrange_assets
 
 if [[ -z "${CUDA_VISIBLE_DEVICES:-}" ]]; then
   export CUDA_VISIBLE_DEVICES="0,1,2,3"
