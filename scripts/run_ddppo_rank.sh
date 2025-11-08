@@ -8,7 +8,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CONFIG_NAME="rearrange/rl_skill.yaml"
 NUM_ENVS=8
 MASTER_PORT=23456
-MASTER_HOST="ripper.lan"
+MASTER_HOST="ripper"
 NUM_NODES=2
 DDPPO_ENV_FILE="${REPO_ROOT}/scripts/.ddppo_env"
 
@@ -21,33 +21,63 @@ MASTER_HOST="${DDPPO_MASTER_ADDR:-${MASTER_HOST}}"
 MASTER_PORT="${DDPPO_MASTER_PORT:-${MASTER_PORT}}"
 NUM_NODES="${DDPPO_NUM_NODES:-${NUM_NODES}}"
 
-# hostname-specific settings
-HOSTNAME="$(hostname -f 2>/dev/null || hostname)"
-if [[ -n "${DDPPO_NODE_RANK:-}" ]]; then
-  NODE_RANK="${DDPPO_NODE_RANK}"
-  if [[ -n "${DDPPO_CUDA_DEVICES:-}" ]]; then
-    CUDA_VISIBLE_DEVICES="${DDPPO_CUDA_DEVICES}"
-  fi
-else
-  case "${HOSTNAME}" in
-    ripper.lan)
-      NODE_RANK=0
-      CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0,1,2,3}"
+# hostname-specific settings (ripper, ripper2)
+HOST_FQDN="$(hostname -f 2>/dev/null || hostname)"
+HOST_SHORT="$(hostname 2>/dev/null || echo "${HOST_FQDN}")"
+HOST_DEFAULT_NODE_RANK=""
+HOST_DEFAULT_GPUS=""
+
+normalize_host() {
+  local host="$1"
+  printf '%s' "${host,,}"
+}
+
+declare -a HOST_LOOKUPS=()
+HOST_LOOKUPS+=("$(normalize_host "${HOST_FQDN}")")
+if [[ "${HOST_SHORT}" != "${HOST_FQDN}" ]]; then
+  HOST_LOOKUPS+=("$(normalize_host "${HOST_SHORT}")")
+fi
+
+for host in "${HOST_LOOKUPS[@]}"; do
+  case "${host}" in
+    ripper|ripper.lan|ripper.local)
+      HOST_DEFAULT_NODE_RANK=0
+      HOST_DEFAULT_GPUS="0,1,2,3"
+      break
       ;;
-    ripper2.lan)
-      NODE_RANK=1
-      CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0,1,2,3}"
-      ;;
-    *)
-      echo "Unknown host ${HOSTNAME}. Provide DDPPO_NODE_RANK (see scripts/setup_headless_server.sh)." >&2
-      exit 1
+    ripper2|ripper2.lan|ripper2.local)
+      HOST_DEFAULT_NODE_RANK=1
+      HOST_DEFAULT_GPUS="0,1,2,3"
+      break
       ;;
   esac
+done
+
+NODE_RANK="${DDPPO_NODE_RANK:-}"
+if [[ -z "${NODE_RANK}" && -n "${HOST_DEFAULT_NODE_RANK}" ]]; then
+  NODE_RANK="${HOST_DEFAULT_NODE_RANK}"
+fi
+if [[ -z "${NODE_RANK}" ]]; then
+  echo "Unable to determine NODE_RANK for host ${HOST_FQDN}. Set DDPPO_NODE_RANK or run scripts/setup_headless_server.sh." >&2
+  exit 1
+fi
+
+if [[ -n "${DDPPO_CUDA_DEVICES:-}" ]]; then
+  CUDA_VISIBLE_DEVICES="${DDPPO_CUDA_DEVICES}"
+elif [[ -z "${CUDA_VISIBLE_DEVICES:-}" && -n "${HOST_DEFAULT_GPUS}" ]]; then
+  CUDA_VISIBLE_DEVICES="${HOST_DEFAULT_GPUS}"
+fi
+
+if [[ -z "${CUDA_VISIBLE_DEVICES:-}" ]]; then
+  echo "CUDA_VISIBLE_DEVICES is not set. Export it or set DDPPO_CUDA_DEVICES." >&2
+  exit 1
 fi
 
 # shellcheck source=/dev/null
 source "${REPO_ROOT}/scripts/setup_headless_env.sh"
 export CUDA_VISIBLE_DEVICES
+
+echo "[ddppo] Host=${HOST_FQDN} Rank=${NODE_RANK} GPUs=${CUDA_VISIBLE_DEVICES} Master=${MASTER_HOST}:${MASTER_PORT} Nodes=${NUM_NODES}"
 
 IFS=',' read -r -a GPU_IDS <<< "${CUDA_VISIBLE_DEVICES}"
 NUM_GPUS="${#GPU_IDS[@]}"

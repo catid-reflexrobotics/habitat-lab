@@ -43,12 +43,45 @@ APT_PACKAGES=(
 )
 DOWNLOAD_UIDS=("rearrange_task_assets")
 DDPPO_ENV_FILE="${REPO_ROOT}/scripts/.ddppo_env"
-MASTER_ADDR_DEFAULT="$(hostname -f 2>/dev/null || hostname)"
+HOST_FQDN="$(hostname -f 2>/dev/null || hostname)"
+HOST_SHORT="$(hostname 2>/dev/null || echo "${HOST_FQDN}")"
+MASTER_ADDR_DEFAULT="${HOST_FQDN}"
+HOST_NODE_RANK_DEFAULT=0
+HOST_CUDA_DEFAULT="${CUDA_VISIBLE_DEVICES:-}"
+HOST_PROFILE=""
+HOST_PROFILE_MSG=""
+declare -a HOST_ALIAS_LOOKUP=()
+HOST_ALIAS_LOOKUP+=("${HOST_FQDN,,}")
+if [[ "${HOST_SHORT}" != "${HOST_FQDN}" ]]; then
+  HOST_ALIAS_LOOKUP+=("${HOST_SHORT,,}")
+fi
+for host in "${HOST_ALIAS_LOOKUP[@]}"; do
+  case "${host}" in
+    ripper|ripper.lan|ripper.local)
+      HOST_PROFILE="ripper"
+      MASTER_ADDR_DEFAULT="ripper"
+      HOST_NODE_RANK_DEFAULT=0
+      HOST_CUDA_DEFAULT="${HOST_CUDA_DEFAULT:-0,1,2,3}"
+      break
+      ;;
+    ripper2|ripper2.lan|ripper2.local)
+      HOST_PROFILE="ripper2"
+      MASTER_ADDR_DEFAULT="ripper"
+      HOST_NODE_RANK_DEFAULT=1
+      HOST_CUDA_DEFAULT="${HOST_CUDA_DEFAULT:-0,1,2,3}"
+      break
+      ;;
+  esac
+done
+HOST_CUDA_DEFAULT="${HOST_CUDA_DEFAULT:-0,1,2,3}"
 DDPPO_MASTER_ADDR="${MASTER_ADDR_DEFAULT}"
 DDPPO_MASTER_PORT="23456"
 DDPPO_NUM_NODES="2"
-DDPPO_NODE_RANK="${DDPPO_NODE_RANK:-0}"
-DDPPO_CUDA_DEVICES="${CUDA_VISIBLE_DEVICES:-0,1,2,3}"
+DDPPO_NODE_RANK="${HOST_NODE_RANK_DEFAULT}"
+DDPPO_CUDA_DEVICES="${HOST_CUDA_DEFAULT}"
+if [[ -n "${HOST_PROFILE}" ]]; then
+  HOST_PROFILE_MSG="Detected host profile '${HOST_PROFILE}' (rank ${HOST_NODE_RANK_DEFAULT}, master ${MASTER_ADDR_DEFAULT})."
+fi
 SKIP_APT=0
 SKIP_CONDA_INSTALL=0
 SKIP_DATASETS=0
@@ -315,6 +348,9 @@ ensure_ubuntu() {
 
 main() {
   ensure_ubuntu
+  if [[ -n "${HOST_PROFILE_MSG}" ]]; then
+    log "${HOST_PROFILE_MSG}"
+  fi
   run_apt_installs
   install_miniconda
   ensure_conda_env
@@ -337,10 +373,10 @@ Habitat-Lab headless setup complete.
 - DD-PPO env   : ${env_note}
 
 Next steps:
-  1. SSH into each node, run this script (set --node-rank accordingly).
+  1. SSH into each node, run this script (ripper hosts auto-detect their rank; use --node-rank to override).
   2. On every session source scripts/setup_headless_env.sh
      (run_ddppo_rank.sh does this automatically).
-  3. Launch training with scripts/run_ddppo_rank.sh.
+  3. Launch training with scripts/run_ddppo_rank.sh (no args needed on ripper*).
 ============================================================
 SUMMARY
 }
