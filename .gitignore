@@ -99,6 +99,9 @@ data
 # HITL outputs
 /hitl_output*
 
+# DD-PPO headless helper
+scripts/.ddppo_env
+
 # outputs from other libraries
 /sandbox
 /plots/outputs

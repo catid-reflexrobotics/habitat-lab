@@ -107,6 +107,26 @@ If you use the Habitat platform in your research, please cite the [Habitat 1.0](
       pip install -e habitat-baselines  # install habitat_baselines
       ```
 
+### Headless Ubuntu server setup
+
+Use `scripts/setup_headless_server.sh` to bootstrap a fresh headless Ubuntu box (or VM) so it can run the distributed DD-PPO launchers. The script:
+
+- Installs the system dependencies Habitat-Sim needs (Mesa/EGL, GLFW, build tooling, etc.).
+- Installs Miniconda (if `~/miniconda3` does not already exist), creates/updates the `habitat` environment, and installs PyTorch, habitat-sim (with bullet), habitat-lab, and habitat-baselines.
+- Downloads the ReplicaCAD rearrangement assets plus the DD-PPO pretrained weights expected by `rearrange/rl_skill.yaml`.
+- Writes `scripts/.ddppo_env` with defaults for `DDPPO_MASTER_ADDR`, `DDPPO_MASTER_PORT`, `DDPPO_NUM_NODES`, `DDPPO_NODE_RANK`, and `DDPPO_CUDA_DEVICES`; `scripts/run_ddppo_rank.sh` sources this file automatically.
+
+Example usage for the rank-0 node on a two-machine setup:
+
+```bash
+bash scripts/setup_headless_server.sh \
+  --master-addr master.example.com \
+  --node-rank 0 \
+  --cuda-devices 0,1,2,3
+```
+
+Run the script on every participating node (changing `--node-rank` as needed). Afterwards simply execute `scripts/run_ddppo_rank.sh`; it activates the conda env via `scripts/setup_headless_env.sh`, loads `.ddppo_env` if present, and forwards the `DDPPO_*` overrides to `torchrun`, so no manual edits to the launcher are required when you add new hosts.
+
 ## Testing
 
 1. Let's download some 3D assets using Habitat-Sim's python data download utility:
